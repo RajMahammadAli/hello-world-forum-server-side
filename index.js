@@ -10,7 +10,7 @@ const cors = require("cors");
 app.use(cors());
 app.use(express.json());
 
-const { MongoClient, ServerApiVersion } = require("mongodb");
+const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const uri =
   "mongodb+srv://alircraj:jVUqcOWEmGU0BimI@cluster0.9hya0nn.mongodb.net/?retryWrites=true&w=majority";
 
@@ -30,10 +30,17 @@ async function run() {
 
     const database = client.db("addPostsDB");
     const userCollection = database.collection("addPosts");
+    const commentsCollection = database.collection("comments");
 
-    app.get("/addPosts", async (req, res) => {
+    app.get("/allPosts", async (req, res) => {
       const cursor = userCollection.find();
       const result = await cursor.toArray();
+      res.send(result);
+    });
+    app.get("/allPosts/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await userCollection.findOne(query);
       res.send(result);
     });
 
@@ -42,6 +49,12 @@ async function run() {
       const result = await userCollection.insertOne(addPosts);
       res.send(result);
       console.log(addPosts);
+    });
+    app.post("/comments", async (req, res) => {
+      const comments = req.body;
+      const result = await commentsCollection.insertOne(comments);
+      res.send(result);
+      console.log(comments);
     });
 
     // Send a ping to confirm a successful connection
