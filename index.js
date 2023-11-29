@@ -50,6 +50,14 @@ async function run() {
       res.send(result);
       console.log(addPosts);
     });
+
+    app.get("/comments/:postTitle", async (req, res) => {
+      const postTitle = req.params.postTitle;
+      const cursor = commentsCollection.find({ postTitle: postTitle });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
     app.post("/comments", async (req, res) => {
       const comments = req.body;
       const result = await commentsCollection.insertOne(comments);
