@@ -51,11 +51,14 @@ async function run() {
       console.log(addPosts);
     });
 
-    app.get("/comments/:postTitle", async (req, res) => {
-      const postTitle = req.params.postTitle;
-      const cursor = commentsCollection.find({ postTitle: postTitle });
-      const result = await cursor.toArray();
-      res.send(result);
+    app.get("/comments", async (req, res) => {
+      try {
+        const comments = await commentsCollection.find().toArray();
+        res.json(comments);
+      } catch (error) {
+        console.error("Error fetching comments:", error);
+        res.status(500).send("Internal Server Error");
+      }
     });
 
     app.post("/comments", async (req, res) => {
@@ -64,6 +67,102 @@ async function run() {
       res.send(result);
       console.log(comments);
     });
+
+    // New endpoint for sorting by PostUpVote and PostDownVote
+    app.get("/popular", async (req, res) => {
+      try {
+        const posts = await userCollection
+          .aggregate([
+            {
+              $addFields: {
+                upvoteMinusDownvote: {
+                  $subtract: [
+                    { $ifNull: ["$PostUpVote", 0] },
+                    { $ifNull: ["$PostDownVote", 0] },
+                  ],
+                },
+              },
+            },
+            {
+              $sort: { upvoteMinusDownvote: -1 },
+            },
+          ])
+          .toArray();
+
+        res.send(posts);
+      } catch (error) {
+        console.error("Error fetching popular posts:", error);
+        res.status(500).json({ error: "Internal Server Error" });
+      }
+    });
+
+    app.put("/allPosts/:id", async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const options = { upsert: true };
+      const updateData = req.body;
+      console.log(updateData);
+
+      let updateField;
+      let updatedCount;
+
+      if (updateData.postUpVote !== undefined) {
+        // Increment upVote by one
+        updatedCount = updateData.postUpVote;
+        updateField = "postUpVote";
+      } else if (updateData.postDownVote !== undefined) {
+        // Increment downVote by one
+        updatedCount = updateData.postDownVote;
+        updateField = "postDownVote";
+      } else {
+        res.status(400).send("Invalid update data");
+        return;
+      }
+
+      const updateObject = {
+        $set: {
+          [updateField]: updatedCount,
+        },
+      };
+
+      try {
+        const result = await userCollection.updateOne(
+          filter,
+          updateObject,
+          options
+        );
+        res.send(result);
+      } catch (error) {
+        console.error("Error updating product:", error);
+        res.status(500).send("Internal Server Error");
+      }
+    });
+
+    // app.put("/allPosts/:id", async (req, res) => {
+    //   const id = req.params.id;
+    //   const filter = { _id: new ObjectId(id) };
+    //   const options = { upsert: true };
+    //   const updateData = req.body;
+    //   const updatedDownVote = updateData.postDownVote + 1; // Increment downVote by one
+
+    //   const downVoteUpdate = {
+    //     $set: {
+    //       postDownVote: updatedDownVote,
+    //     },
+    //   };
+
+    //   try {
+    //     const result = await userCollection.updateOne(
+    //       filter,
+    //       downVoteUpdate,
+    //       options
+    //     );
+    //     res.send(result);
+    //   } catch (error) {
+    //     console.error("Error updating product:", error);
+    //     res.status(500).send("Internal Server Error");
+    //   }
+    // });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
